@@ -26,9 +26,7 @@ public class Arena {
     /** Procesa efectos y aturdimiento. @return true si el personaje puede actuar este turno */
     public boolean iniciarTurno(Personaje personaje) {
         personaje.alIniciarTurno();
-        for (String mensaje : personaje.procesarEfectos()) {
-            registro.agregar(mensaje);
-        }
+
         if (!personaje.estaVivo()) {
             registro.agregar("%s cae derrotado por sus efectos", personaje.getNombre());
             return false;
@@ -82,6 +80,9 @@ public class Arena {
             turnoAutomatico(a, b);
             turnoAutomatico(b, a);
         }
-        return a.getVida() >= b.getVida() ? a : b;
+        Personaje ganador = a.getVida() >= b.getVida() ? a : b;
+        a.detenerEfectos();
+        b.detenerEfectos();
+        return ganador;
     }
 }
