@@ -16,6 +16,11 @@ import com.rpg.items.Pocion;
 import java.util.List;
 import java.util.Random;
 
+import com.rpg.concurrency.GestorTurno;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import com.rpg.concurrency.AutoGuardadoDaemon;
+
 /** Coordina el flujo del juego: crear heroe, combatir, torneo, bestiario y guardado. */
 public class MotorJuego {
 
@@ -31,10 +36,15 @@ public class MotorJuego {
     private final TorneoManager torneo = new TorneoManager(arena, registro);
     // TALLER ARCHIVOS: ultimoGuardado es solo el estado de la partida en memoria. Aqui (o en un metodo
     // nuevo como cargarProgreso) iria la carga de una partida guardada en disco; llamala desde Main.
-    private String ultimoGuardado = "";
+    private volatile String ultimoGuardado = "";
+    private static final int SEGUNDOS_TURNO = 30;
+    private final GestorTurno gestorTurno = new GestorTurno();
 
     public MotorJuego(Consola consola) {
         this.consola = consola;
+        Thread autoGuardado = new Thread(new AutoGuardadoDaemon(this::guardarProgreso, 30_000), "auto-guardado");
+        autoGuardado.setDaemon(true); // siempre ANTES de start()
+        autoGuardado.start();
     }
 
     // ---- opciones del menu principal
@@ -152,6 +162,10 @@ public class MotorJuego {
             if (accion == Accion.HUIR) {
                 return true;
             }
+            if (accion == null) {
+                registro.agregar("%s pierde el turno por tardar demasiado.", jugador.getNombre());
+                return false;
+            }
             turnoGastado = switch (accion) {
                 case ATACAR -> {
                     arena.atacar(jugador, enemigo);
@@ -172,10 +186,17 @@ public class MotorJuego {
      * Pide la accion al jugador y se queda esperando hasta que escriba algo.
      */
     private Accion pedirAccion() {
-        // TALLER CONCURRENCIA: esta lectura bloquea el programa sin limite de tiempo.
-        // Aqui debe entrar el temporizador de turno con su callback.
+        AtomicBoolean tiempoAgotado = new AtomicBoolean(false);
+        gestorTurno.iniciar(SEGUNDOS_TURNO, () -> {
+            tiempoAgotado.set(true);
+            System.out.println("\nTiempo agotado! Pulsa Enter para continuar...");
+        });
         System.out.println("1. Atacar  2. Habilidad especial  3. Usar pocion  4. Ver estado  0. Huir");
         int opcion = consola.leerEntero("Accion: ", 0, 4);
+        gestorTurno.cancelar();
+        if (tiempoAgotado.get()) {
+            return null; // turno perdido
+        }
         return switch (opcion) {
             case 1 -> Accion.ATACAR;
             case 2 -> Accion.ESPECIAL;
@@ -216,6 +237,8 @@ public class MotorJuego {
     // ---- resultado del combate
 
     private void cerrarCombate(Personaje jugador, Enemigo enemigo, boolean huyo) {
+        jugador.detenerEfectos();
+        enemigo.detenerEfectos();
         if (huyo) {
             registro.agregar("%s huye del combate.", jugador.getNombre());
         } else if (jugador.estaVivo()) {
@@ -256,7 +279,7 @@ public class MotorJuego {
      * Guarda las estadisticas en memoria (el texto queda en {@code ultimoGuardado}); aun no se escribe ningun
      * archivo. Hoy solo se invoca al terminar una pelea.
      */
-    public void guardarProgreso() {
+    public synchronized void guardarProgreso() {
         // TALLER ARCHIVOS: ademas de dejar el texto en memoria, escribe la partida en disco (por ejemplo un
         // .txt con BufferedWriter, y/o un .dat serializando el estado con ObjectOutputStream). Usa try-with-resources.
         // TALLER CONCURRENCIA: este guardado es manual. Debera hacerse solo, de fondo, mientras se juega.
