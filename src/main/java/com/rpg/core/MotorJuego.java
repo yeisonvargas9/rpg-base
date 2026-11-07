@@ -21,6 +21,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.rpg.concurrency.AutoGuardadoDaemon;
 
+import java.util.function.Consumer;
+
 /** Coordina el flujo del juego: crear heroe, combatir, torneo, bestiario y guardado. */
 public class MotorJuego {
 
@@ -37,8 +39,14 @@ public class MotorJuego {
     // TALLER ARCHIVOS: ultimoGuardado es solo el estado de la partida en memoria. Aqui (o en un metodo
     // nuevo como cargarProgreso) iria la carga de una partida guardada en disco; llamala desde Main.
     private volatile String ultimoGuardado = "";
-    private static final int SEGUNDOS_TURNO = 30;
+    private static final int SEGUNDOS_TURNO = 15;
     private final GestorTurno gestorTurno = new GestorTurno();
+
+    private Consumer<String> alVencer = nombre -> { };
+
+    public void setAlVencer(Consumer<String> alVencer) {
+        this.alVencer = alVencer;
+    }
 
     public MotorJuego(Consola consola) {
         this.consola = consola;
@@ -245,6 +253,7 @@ public class MotorJuego {
             registro.agregar("%nVictoria de %s!", jugador.getNombre());
             perfil.registrarVictoria();
             bestiario.registrarEnemigoDerrotado(enemigo.getNombre());
+            alVencer.accept(enemigo.getNombre());
             desbloquearLogros(jugador, enemigo);
             repartirBotin(jugador);
         } else {
@@ -294,7 +303,7 @@ public class MotorJuego {
         contenido.append(System.lineSeparator()).append("--- Ultimo combate ---").append(System.lineSeparator());
         contenido.append(registro.getTexto());
         ultimoGuardado = contenido.toString();
-        System.out.println("[Progreso guardado en memoria]");
+
     }
 
     public String getUltimoGuardado() {
