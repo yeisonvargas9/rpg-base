@@ -28,14 +28,17 @@ public class MenuPrincipalUI {
         do {
             System.out.println("\n=== MENU PRINCIPAL ===");
             System.out.println("1. Combate rapido  2. Torneo  3. Bestiario del juego");
-            System.out.println("4. Monstruos (BD)  5. Ranking  0. Cerrar sesion");
-            opcion = consola.leerEntero("Opcion: ", 0, 5);
+            System.out.println("4. Monstruos (BD)  5. Ranking  6. Historial  7. Cargar partida  8. Borrar partida  0. Cerrar sesion");
+            opcion = consola.leerEntero("Opcion: ", 0, 8);
             switch (opcion) {
                 case 1 -> motor.combateRapido();
                 case 2 -> motor.jugarTorneo();
                 case 3 -> motor.mostrarBestiario();
                 case 4 -> monstruoUI.mostrar();
                 case 5 -> rankingUI.mostrar();
+                case 6 -> motor.mostrarHistorial();
+                case 7 -> motor.cargarPartida();
+                case 8 -> motor.borrarPartida();
                 default -> { }
             }
         } while (opcion != 0);

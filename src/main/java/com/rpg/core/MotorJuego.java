@@ -23,6 +23,9 @@ import com.rpg.concurrency.AutoGuardadoDaemon;
 
 import java.util.function.Consumer;
 
+import com.rpg.persistencia.GestorArchivos;
+import com.rpg.persistencia.PartidaGuardada;
+
 /** Coordina el flujo del juego: crear heroe, combatir, torneo, bestiario y guardado. */
 public class MotorJuego {
 
@@ -33,8 +36,9 @@ public class MotorJuego {
     private final RegistroCombate registro = new RegistroCombate();
     private final Arena arena = new Arena(registro, new Random());
     private final Bestiario bestiario = new Bestiario();
-    private final PerfilJugador perfil = new PerfilJugador();
-    private final Gremio gremio = new Gremio(NOMBRE_GREMIO);
+    private PerfilJugador perfil = new PerfilJugador();
+    private Gremio gremio = new Gremio(NOMBRE_GREMIO);
+    private volatile boolean hayProgreso = false;
     private final TorneoManager torneo = new TorneoManager(arena, registro);
     // TALLER ARCHIVOS: ultimoGuardado es solo el estado de la partida en memoria. Aqui (o en un metodo
     // nuevo como cargarProgreso) iria la carga de una partida guardada en disco; llamala desde Main.
@@ -66,6 +70,8 @@ public class MotorJuego {
         boolean huyo = combatir(jugador, enemigo);
 
         cerrarCombate(jugador, enemigo, huyo);
+        hayProgreso = true;
+        GestorArchivos.agregarLog(registro.getTexto());
         guardarProgreso();
     }
 
@@ -74,6 +80,8 @@ public class MotorJuego {
         Personaje campeon = torneo.jugarTorneo();
         registro.agregar("%nCAMPEON DEL TORNEO: %s", campeon.getNombre());
         perfil.desbloquearLogro("Campeon del Torneo");
+        hayProgreso = true;
+        GestorArchivos.agregarLog(registro.getTexto());
         guardarProgreso();
     }
 
@@ -303,9 +311,40 @@ public class MotorJuego {
         contenido.append(System.lineSeparator()).append("--- Ultimo combate ---").append(System.lineSeparator());
         contenido.append(registro.getTexto());
         ultimoGuardado = contenido.toString();
+        if (hayProgreso) {
+            GestorArchivos.guardarPartida(new PartidaGuardada(perfil, gremio));
+        }
 
     }
+    public void mostrarHistorial() {
+        System.out.println("\n=== HISTORIAL DE COMBATES ===");
+        GestorArchivos.mostrarInfo(GestorArchivos.LOG);
+        GestorArchivos.leerLog().forEach(System.out::println);
+    }
 
+    public void cargarPartida() {
+        PartidaGuardada partida = GestorArchivos.cargarPartida();
+        if (partida == null) {
+            return;
+        }
+        perfil = partida.getPerfil();
+        gremio = partida.getGremio();
+        hayProgreso = true;
+        System.out.printf("Partida cargada: %d victorias, %d derrotas, gremio %s con %d miembros.%n",
+                perfil.getVictorias(), perfil.getDerrotas(), gremio.getNombre(), gremio.getMiembros().size());
+        for (Personaje miembro : gremio.getMiembros()) {
+            System.out.println(miembro.getNombre() + " sigue en su gremio: " + (miembro.getGremio() == gremio));
+        }
+    }
+
+    public void borrarPartida() {
+        int respuesta = consola.leerEntero("Borrar la partida guardada? (1 = si, 0 = no): ", 0, 1);
+        if (respuesta == 0) {
+            System.out.println("Operacion cancelada.");
+            return;
+        }
+        System.out.println(GestorArchivos.borrarPartida() ? "Partida borrada." : "No habia partida guardada.");
+    }
     public String getUltimoGuardado() {
         return ultimoGuardado;
     }
