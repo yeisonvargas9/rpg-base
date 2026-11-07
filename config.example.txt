@@ -1,0 +1,3 @@
+url=jdbc:mysql://localhost:3306/rpg_arena_db
+usuario=rpg
+clave=Rpg12345!
