@@ -104,13 +104,18 @@ public abstract class Personaje implements ICombatiente {
 
     // ---- vida
 
-    public synchronized void recibirDanio(int cantidad) {
+    public void recibirDanio(int cantidad) {
         if (cantidad < 0) {
             throw new IllegalArgumentException("El danio no puede ser negativo");
         }
-        // TALLER CONCURRENCIA: lee, calcula y escribe la vida en pasos separados sin proteccion.
-        // Con varios hilos sobre el mismo Personaje (aqui y en curar), el resultado no es seguro.
-        setVida(vida - cantidad);
+        candado.lock();
+        try {
+            synchronized (this) {   // para no mezclarse con curar(), que usa synchronized
+                setVida(vida - cantidad);
+            }
+        } finally {
+            candado.unlock();       // siempre en el finally
+        }
     }
     /*
      * Version con ReentrantLock (investigacion obligatoria). El unlock() va SIEMPRE en el finally:
@@ -119,17 +124,7 @@ public abstract class Personaje implements ICombatiente {
      * (poder cancelar la espera) o un lock "justo". Si no necesito eso, synchronized es mas simple
      * porque se libera solo.
      */
-    public void recibirDanioConLock(int cantidad) {
-        if (cantidad < 0) {
-            throw new IllegalArgumentException("El danio no puede ser negativo");
-        }
-        candado.lock();
-        try {
-            setVida(vida - cantidad);
-        } finally {
-            candado.unlock();
-        }
-    }
+
     /** @return vida realmente recuperada */
     public synchronized int curar(int cantidad) {
         if (cantidad < 0) {
