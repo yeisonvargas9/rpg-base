@@ -2,9 +2,11 @@ package com.rpg.entities;
 
 import com.rpg.entities.enums.RaridadItem;
 
-// TALLER ARCHIVOS: candidata a Serializable (la referencia desde Personaje.arma la necesita).
-public class Arma {
+import java.io.Serializable;
 
+// TALLER ARCHIVOS: candidata a Serializable (la referencia desde Personaje.arma la necesita).
+public class Arma  implements Serializable {
+    private static final long serialVersionUID = 1L;
     private final String nombre;
     private final int danioBase;
     private final RaridadItem raridad;

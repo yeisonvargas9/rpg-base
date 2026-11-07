@@ -21,12 +21,18 @@ import java.util.HashMap;
 
 import java.util.concurrent.locks.ReentrantLock;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+
 // TALLER ARCHIVOS: para guardar la partida con ObjectOutputStream, Personaje debe volverse Serializable
 // (con serialVersionUID). Piensa que campos son transient y que clases anidadas (Inventario, Pocion, Arma,
 // Gremio, EstadoEfecto, enums) tambien deben ser Serializable, o tendras NotSerializableException.
 // Ojo: Gremio y Personaje se referencian entre si (la serializacion maneja el ciclo).
-public abstract class Personaje implements ICombatiente {
+public abstract class Personaje implements ICombatiente, Serializable {
 
+    private static final long serialVersionUID = 1L;
     private static final int VIDA_BASE = 100;
     private static final int ATAQUE_BASE = 10;
     private static final int DEFENSA_BASE = 5;
@@ -48,7 +54,7 @@ public abstract class Personaje implements ICombatiente {
     private final Set<String> habilidades = new HashSet<>();
     private final Map<String, EstadoEfecto> efectos = new LinkedHashMap<>();
     private static final long INTERVALO_EFECTO_MS = 2000;
-    private final Map<String, Thread> hilosEfectos = new HashMap<>();
+    private transient Map<String, Thread> hilosEfectos = new HashMap<>();
     private final ReentrantLock candado = new ReentrantLock();
 
     protected Personaje(String nombre, TipoPersonaje tipo) {
@@ -143,7 +149,17 @@ public abstract class Personaje implements ICombatiente {
         estado = EstadoPersonaje.VIVO;
         vida = vidaMaxima;
     }
+    /** Serializa bajo el monitor del personaje, para no chocar con los hilos de efectos. */
+    private synchronized void writeObject(ObjectOutputStream out) throws IOException {
+        out.defaultWriteObject();
+    }
 
+    private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+        in.defaultReadObject();
+        hilosEfectos = new HashMap<>(); // transient: llega en null, se vuelve a crear
+        efectos.clear();                // los hilos no sobreviven a la carga
+        normalizarEstado();
+    }
     @Override
     public synchronized boolean estaVivo() {
         return estado != EstadoPersonaje.MUERTO;
